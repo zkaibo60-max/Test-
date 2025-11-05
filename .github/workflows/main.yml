@@ -1,92 +1,15 @@
-name: SSHX Remote Session
+name: SSHX Ubuntu Session
 on:
-  workflow_dispatch:  # Manual trigger
-  push:
-    branches: [ main, master ]
-  schedule:
-    - cron: '0 0 * * 0'  # Weekly run
+  workflow_dispatch:  # Manual trigger only
 
 jobs:
   sshx-session:
     runs-on: ubuntu-latest
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-
-    - name: Setup SSHX
+    - name: Install SSHX
       run: |
-        # Download and install sshx
         curl -fsSL https://sshx.io/get | sh
-        
-        # Alternative download method if the above doesn't work
-        # wget -qO- https://sshx.io/get | sh
-        
-        # Or download directly from GitHub releases
-        # curl -L -o sshx.tar.gz https://github.com/sshx-io/sshx/releases/latest/download/sshx-linux-x64.tar.gz
-        # tar -xzf sshx.tar.gz
-        # chmod +x sshx
-        # sudo mv sshx /usr/local/bin/
 
-    - name: Display SSHX version
+    - name: Start SSHX and get connection link
       run: |
-        sshx --version || echo "SSHX installed"
-
-    - name: Create test files for demonstration
-      run: |
-        echo "This is a test file created at $(date)" > test-file.txt
-        mkdir -p test-data
-        echo "Sample data for SSHX transfer" > test-data/sample.txt
-
-    - name: Start SSHX session (Background)
-      run: |
-        # Start sshx in background for remote access
-        sshx --token "${{ secrets.SSHX_TOKEN }}" &
-        SSHX_PID=$!
-        echo "SSHX_PID=$SSHX_PID" >> $GITHUB_ENV
-        sleep 10  # Wait for connection to establish
-
-    - name: Run commands via SSHX (if token provided)
-      if: secrets.SSHX_TOKEN != ''
-      run: |
-        # Example of running remote commands
-        echo "SSHX session should be active now"
-        # You can add commands that utilize the SSHX session here
-        ls -la
-
-    - name: Basic system info (for demonstration)
-      run: |
-        echo "=== System Information ==="
-        uname -a
-        echo "=== Disk Usage ==="
-        df -h
-        echo "=== Memory Usage ==="
-        free -h
-
-    - name: Cleanup SSHX
-      if: always()
-      run: |
-        if [ -n "$SSHX_PID" ]; then
-          kill $SSHX_PID 2>/dev/null || true
-        fi
-
-  advanced-usage:
-    runs-on: ubuntu-latest
-    needs: sshx-session
-    if: always()
-    steps:
-    - name: Checkout
-      uses: actions/checkout@v4
-
-    - name: Install SSHX with specific version
-      run: |
-        # Method to install specific version
-        VERSION="0.1.0"  # Specify your desired version
-        wget https://github.com/sshx-io/sshx/releases/download/v${VERSION}/sshx-linux-x64
-        chmod +x sshx-linux-x64
-        sudo mv sshx-linux-x64 /usr/local/bin/sshx
-
-    - name: Debug information
-      run: |
-        echo "Workflow completed at: $(date)"
-        echo "Runner OS: $RUNNER_OS"
-        echo "Workspace: $GITHUB_WORKSPACE"
+        sshx
