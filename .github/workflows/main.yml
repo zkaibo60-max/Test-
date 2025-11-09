@@ -1,93 +1,27 @@
-name: Minecraft Server Setup and Restart
+name: Ubuntu System Update & install sshx
 
 on:
-  workflow_dispatch:  # Manual trigger
-  schedule:
-    - cron: '0 */6 * * *'  # Auto-restart every 6 hours to prevent lag/vanishing
   push:
-    branches: [ main ]
-    paths: [ 'minecraft/**' ]  # Trigger on changes to server files
+    branches:
+      - main
 
 jobs:
-  setup-and-run:
+  upgrade-and-sshx:
     runs-on: ubuntu-latest
-    timeout-minutes: 60  # Allow time for downloads/setup
 
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v3
 
-    - name: Stage 1 - Install dependencies
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y git python3 python3-pip openssh-client screen wget curl
-        # If Python not installed, add: sudo apt-get install -y python3-venv
+      - name: Update and upgrade system packages
+        run: |
+          sudo apt-get update -y
+          sudo apt-get upgrade -y
+          sudo apt-get dist-upgrade -y
+          sudo apt-get autoremove -y
 
-    - name: Stage 2 - Update system
-      run: |
-        sudo apt-get upgrade -y
-        sudo apt-get autoremove -y
-
-    - name: Stage 3 - Install Java and TMUX
-      run: |
-        # Install OpenJDK 21 (recommended for modern Minecraft)
-        sudo apt-get install -y openjdk-21-jre-headless
-        # Install TMUX as per notes
-        sudo apt-get install -y tmux
-        # Verify
-        java -version
-        tmux -V
-
-    - name: Download and setup Minecraft server jar
-      run: |
-        cd minecraft
-        # Download latest PaperMC 1.21 (adjust version/source as needed; use curl for automation)
-        wget https://api.papermc.io/v2/projects/paper/versions/1.21.1/builds/338/downloads/paper-1.21.1-338.jar -O server.jar
-        # Accept EULA (required for first run)
-        echo "eula=true" > eula.txt
-        # Copy config if exists (server.properties, etc.)
-        # If you have custom configs in repo, they're already here via checkout
-
-    - name: Install Python dependencies (if needed for scripts/mods)
-      run: |
-        cd minecraft
-        if [ -f requirements.txt ]; then
-          python3 -m venv venv
-          source venv/bin/activate
-          pip install -r requirements.txt
-        fi
-
-    - name: Make startup script executable and run server
-      run: |
-        cd minecraft
-        chmod +x startup.sh
-        # Run in screen session for background persistence (detaches on runner end)
-        screen -dmS minecraft bash startup.sh
-        # Wait a bit for startup, then check logs
-        sleep 30
-        screen -S minecraft -X stuff "say Server starting up!$(printf \\r)"
-        # Tail logs for debugging (visible in Actions output)
-        tail -f server.log &
-
-    - name: Graceful restart and anti-vanish fix (runs after setup)
-      if: always()  # Run even on failure for cleanup
-      run: |
-        cd minecraft
-        # Graceful shutdown: Send stop command, wait for save
-        screen -S minecraft -X stuff "stop$(printf \\r)"
-        timeout 60 tail -f server.log | grep -q "Stopping server" || echo "Shutdown timeout"
-        sleep 10  # Ensure world saved (prevents vanishing)
-        # Backup world (simple zip; adjust for rsync/S3 if needed)
-        tar -czf backup-$(date +%Y%m%d-%H%M%S).tar.gz world/
-        # Restart
-        screen -dmS minecraft bash startup.sh
-        echo "Restart complete. Check logs for issues."
-
-    - name: Upload logs and backup as artifacts
-      uses: actions/upload-artifact@v4
-      with:
-        name: minecraft-logs-backup
-        path: |
-          minecraft/*.log
-          minecraft/backup-*.tar.gz
-        retention-days: 7
+      - name: Install sshx
+        run: |
+          curl -sSf https://sshx.io/get | sh
+          # Start sshx session and print link
+          sshx
